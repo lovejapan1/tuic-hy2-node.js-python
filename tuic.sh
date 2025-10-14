@@ -72,13 +72,22 @@ check_tuic_server() {
     echo "✅ 已找到 tuic-server"
     return
   fi
-  echo "📥 未找到 tuic-server，正在下载..."
+  echo "📥 未找到 tuic-server，正在从 GitHub 获取最新版本并下载..."
   ARCH=$(uname -m)
   if [[ "$ARCH" != "x86_64" ]]; then
     echo "❌ 暂不支持架构: $ARCH"
     exit 1
   fi
-  TUIC_URL="https://github.com/Itsusinn/tuic/releases/download/v1.5.2/tuic-server-x86_64-linux"
+
+  # 获取最新 release tag
+  LATEST_TAG=$(curl -s https://api.github.com/repos/Itsusinn/tuic/releases/latest | grep '"tag_name"' | cut -d '"' -f4)
+  if [[ -z "$LATEST_TAG" ]]; then
+    echo "❌ 无法获取最新版本标签，请检查网络或 GitHub API"
+    exit 1
+  fi
+  echo "✅ 最新版本: $LATEST_TAG"
+
+  TUIC_URL="https://github.com/Itsusinn/tuic/releases/download/$LATEST_TAG/tuic-server-x86_64-linux"
   if curl -L -f -o "$TUIC_BIN" "$TUIC_URL"; then
     chmod +x "$TUIC_BIN"
     echo "✅ tuic-server 下载完成"
@@ -186,6 +195,3 @@ main() {
 }
 
 main "$@"
-
-
-
