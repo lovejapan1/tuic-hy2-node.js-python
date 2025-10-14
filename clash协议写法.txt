@@ -1,0 +1,2 @@
+  - {"name":"TUIC写法","type":"tuic","server":"服务器","port":端口,"uuid":"用户","password":"密码","alpn":["h3"],"disable-sni":true,"reduce-rtt":true,"request-timeout":8000,"udp-relay-mode":"native","congestion-controller":"bbr","skip-cert-verify":true,"sni":"伪装网站"}
+  - {"name":"HY2写法","type":"hysteria2","server":"服务器","port":端口,"password":"密码","sni":"伪装","skip-cert-verify":true,"alpn":["h3"]}
