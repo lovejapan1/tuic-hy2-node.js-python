@@ -20,3 +20,6 @@ curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/ma
 ```
 curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/main/tuic.sh | sed 's/\r$//' | bash -s -- 
 ```
+
+
+* lunes.host  orihost.com
