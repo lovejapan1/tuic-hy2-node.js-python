@@ -22,6 +22,6 @@ curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/ma
 ```
 
 
-## 文档地址
+## 适用
 - [lunes](https://lunes.host/) 和 [orihost](https://orihost.com/)
 ---
