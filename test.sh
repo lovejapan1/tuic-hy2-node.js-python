@@ -111,10 +111,21 @@ configure_port() {
     
     # 交互式输入
     while true; do
-        read -rp "请输入监听端口 (1024-65535，推荐 443 或 22222): " port
-        if [[ ! "$port" =~ ^[0-9]+$ ]] || [[ "$port" -lt 1024 ]] || [[ "$port" -gt 65535 ]]; then
-            log_error "无效端口: $port (必须在 1024-65535 范围内)"
+        read -rp "请输入监听端口 (1024-65535，推荐 22222 或 8443): " port
+        if [[ ! "$port" =~ ^[0-9]+$ ]]; then
+            log_error "无效端口: $port (必须是数字)"
             continue
+        fi
+        if [[ "$port" -lt 1 ]] || [[ "$port" -gt 65535 ]]; then
+            log_error "无效端口: $port (必须在 1-65535 范围内)"
+            continue
+        fi
+        if [[ "$port" -lt 1024 ]]; then
+            log_warn "端口 $port < 1024 需要 root 权限，建议使用 1024 以上端口"
+            read -rp "是否继续使用端口 $port？[y/N]: " confirm
+            if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+                continue
+            fi
         fi
         SERVER_PORT="$port"
         log_success "端口设置为: $SERVER_PORT"
@@ -288,9 +299,14 @@ http:
 EOF
     
     echo -e "\n${CYAN}⚠️  重要提示:${NC}"
-    echo -e "   • 确保防火墙开放 UDP 端口: ${YELLOW}sudo ufw allow ${SERVER_PORT}/udp${NC}"
+    echo -e "   • 确保防火墙开放 UDP 端口:"
+    echo -e "     ${YELLOW}sudo ufw allow ${SERVER_PORT}/udp${NC} (Ubuntu/Debian)"
+    echo -e "     ${YELLOW}sudo firewall-cmd --add-port=${SERVER_PORT}/udp --permanent && sudo firewall-cmd --reload${NC} (CentOS/RHEL)"
     echo -e "   • 查看日志: ${YELLOW}tail -f ${LOG_FILE}${NC}"
     echo -e "   • 连接信息已保存到: ${YELLOW}hysteria2_link.txt${NC}"
+    if [[ $SERVER_PORT -lt 1024 ]]; then
+        echo -e "   • ${RED}注意: 端口 $SERVER_PORT < 1024 可能需要 root 权限运行${NC}"
+    fi
     
     # 启动服务
     echo -e "\n${CYAN}🚀 启动 Hysteria2 服务器...${NC}"
@@ -435,10 +451,7 @@ EOF
 main() {
     print_banner
     
-    # 检查 root 权限（可选）
-    if [[ $EUID -ne 0 ]]; then
-        log_warn "未以 root 用户运行，某些操作可能需要 sudo 权限"
-    fi
+    log_info "脚本以普通用户权限运行（无需 root）"
     
     # 检查必要工具
     for cmd in curl openssl; do
