@@ -22,4 +22,4 @@ curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/ma
 ```
 
 
-* lunes.host  orihost.com
+# lunes.host * orihost.com
