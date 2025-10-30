@@ -99,12 +99,13 @@ bandwidth:
   down: "200mbps"
 
 quic:
-  max_idle_timeout: "30s"  # 增大超时，防移动设备断连
-  max_concurrent_streams: 1024  # 增大并发，官方默认
-  initial_stream_receive_window: 65536
-  max_stream_receive_window: 131072
-  initial_conn_receive_window: 131072
-  max_conn_receive_window: 262144
+  initStreamReceiveWindow: 65536
+  maxStreamReceiveWindow: 131072
+  initConnReceiveWindow: 131072
+  maxConnReceiveWindow: 262144
+  maxIdleTimeout: "10s"
+  maxIncomingStreams: 4
+  disablePathMTUDiscovery: true
 
 disable_udp: false  # 启用UDP转发
 udp_idle_timeout: "60s"
@@ -174,4 +175,5 @@ main() {
 }
 
 main "$@"
+
 
