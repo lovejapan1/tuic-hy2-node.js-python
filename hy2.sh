@@ -1,23 +1,25 @@
 #!/usr/bin/env bash
 # -*- coding: utf-8 -*-
-# Hysteria2 极简部署脚本（支持命令行端口参数 + 默认跳过证书验证）
-# 适用于超低内存环境（32-64MB）
+# Hysteria2 改进部署脚本（支持命令行端口参数 + 默认跳过证书验证）
+# 适用于超低内存环境（32-64MB），添加防火墙提示、日志、完整配置
 
 set -e
 
 # ---------- 默认配置 ----------
-HYSTERIA_VERSION="v2.6.4"
+HYSTERIA_VERSION="v2.6.5"  # 更新到最新版，修复内存泄漏
 DEFAULT_PORT=22222         # 若未提供参数则使用此端口
 AUTH_PASSWORD="ieshare2025"   # 建议修改为复杂密码
 CERT_FILE="cert.pem"
 KEY_FILE="key.pem"
 SNI="www.bing.com"
 ALPN="h3"
+LOG_FILE="hysteria.log"
 # ------------------------------
 
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-echo "Hysteria2 极简部署脚本（Shell 版）"
+echo "Hysteria2 改进部署脚本（Shell 版） - 更新到 v${HYSTERIA_VERSION}"
 echo "支持命令行端口参数，如：bash hysteria2.sh 443"
+echo "提示：运行前确保UDP端口开放（e.g., ufw allow ${DEFAULT_PORT}/udp）"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
 # ---------- 获取端口 ----------
@@ -73,55 +75,74 @@ ensure_cert() {
     echo "🔑 未发现证书，使用 openssl 生成自签证书（prime256v1）..."
     openssl req -x509 -nodes -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
         -days 3650 -keyout "$KEY_FILE" -out "$CERT_FILE" -subj "/CN=${SNI}"
+    chmod 644 "$CERT_FILE" "$KEY_FILE"  # 确保权限
     echo "✅ 证书生成成功。"
 }
 
-# ---------- 写配置文件 ----------
+# ---------- 写配置文件（完整版） ----------
 write_config() {
 cat > server.yaml <<EOF
 listen: ":${SERVER_PORT}"
+
 tls:
   cert: "$(pwd)/${CERT_FILE}"
   key: "$(pwd)/${KEY_FILE}"
   alpn:
     - "${ALPN}"
+
 auth:
   type: "password"
   password: "${AUTH_PASSWORD}"
+
 bandwidth:
   up: "200mbps"
   down: "200mbps"
+
 quic:
-  max_idle_timeout: "10s"
-  max_concurrent_streams: 4
+  max_idle_timeout: "30s"  # 增大超时，防移动设备断连
+  max_concurrent_streams: 1024  # 增大并发，官方默认
   initial_stream_receive_window: 65536
   max_stream_receive_window: 131072
   initial_conn_receive_window: 131072
   max_conn_receive_window: 262144
+
+disable_udp: false  # 启用UDP转发
+udp_idle_timeout: "60s"
+
+masquerade:  # 添加伪装，提升抗检测
+  type: proxy
+  proxy:
+    url: "https://${SNI}"
+    rewrite_host: true
+
+logging:  # 添加日志
+  level: info
+  file: "$(pwd)/${LOG_FILE}"
 EOF
-    echo "✅ 写入配置 server.yaml（端口=${SERVER_PORT}, SNI=${SNI}, ALPN=${ALPN}）。"
+    echo "✅ 写入完整配置 server.yaml（端口=${SERVER_PORT}, SNI=${SNI}, ALPN=${ALPN}）。"
 }
 
-# ---------- 获取服务器 IP ----------
+# ---------- 获取服务器 IP（更可靠） ----------
 get_server_ip() {
-    IP=$(curl -s --max-time 10 https://api.ipify.org || echo "YOUR_SERVER_IP")
+    IP=$(curl -s --max-time 10 https://ifconfig.me || curl -s --max-time 10 https://api.ipify.org || echo "YOUR_SERVER_IP")
     echo "$IP"
 }
 
 # ---------- 打印连接信息 ----------
 print_connection_info() {
     local IP="$1"
-    echo "🎉 Hysteria2 部署成功！（极简优化版）"
+    echo "🎉 Hysteria2 部署成功！（改进优化版）"
     echo "=========================================================================="
     echo "📋 服务器信息:"
     echo "   🌐 IP地址: $IP"
-    echo "   🔌 端口: $SERVER_PORT"
+    echo "   🔌 端口: $SERVER_PORT (确保UDP开放！)"
     echo "   🔑 密码: $AUTH_PASSWORD"
+    echo "   📝 日志: ${LOG_FILE} (tail -f ${LOG_FILE} 查问题)"
     echo ""
     echo "📱 节点链接（SNI=${SNI}, ALPN=${ALPN}）:"
-    echo "hysteria2://${AUTH_PASSWORD}@${IP}:${SERVER_PORT}?sni=${SNI}&alpn=${ALPN}#Hy2-Bing"
+    echo "hysteria2://${AUTH_PASSWORD}@${IP}:${SERVER_PORT}?sni=${SNI}&alpn=${ALPN}&insecure=1#Hy2-Bing"
     echo ""
-    echo "📄 客户端配置文件:"
+    echo "📄 客户端配置文件（添加insecure: true）:"
     echo "server: ${IP}:${SERVER_PORT}"
     echo "auth: ${AUTH_PASSWORD}"
     echo "tls:"
@@ -133,6 +154,10 @@ print_connection_info() {
     echo "http:"
     echo "  listen: 127.0.0.1:8080"
     echo "=========================================================================="
+    echo "⚠️ 排查提示："
+    echo "  - 检查防火墙: ufw allow ${SERVER_PORT}/udp && ufw reload"
+    echo "  - 测试UDP: nc -lvu 0.0.0.0 ${SERVER_PORT} (服务器) / nc -vu ${IP} ${SERVER_PORT} (客户端)"
+    echo "  - 调试启动: nohup ${BIN_PATH} server -c server.yaml --log-level=debug &"
 }
 
 # ---------- 主逻辑 ----------
@@ -142,9 +167,10 @@ main() {
     write_config
     SERVER_IP=$(get_server_ip)
     print_connection_info "$SERVER_IP"
-    echo "🚀 启动 Hysteria2 服务器..."
-    exec "$BIN_PATH" server -c server.yaml
+    echo "🚀 启动 Hysteria2 服务器（后台运行，日志到 ${LOG_FILE}）..."
+    nohup "$BIN_PATH" server -c server.yaml > "$LOG_FILE" 2>&1 &
+    echo "✅ 服务器启动（PID: $!）。检查日志: tail -f ${LOG_FILE}"
+    echo "建议：用systemd守护进程长期运行（参考官方文档）。"
 }
 
 main "$@"
-
