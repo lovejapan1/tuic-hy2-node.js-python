@@ -81,6 +81,10 @@ ensure_cert() {
 
 # ---------- 系统调优（极限提升网速） ----------
 system_tune() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️ 非Root权限，跳过系统调优。请手动运行 sysctl 命令或用Root权限重跑脚本。"
+        return
+    fi
     echo "⚙️ 系统调优：增大UDP缓冲，提升QUIC性能（需root权限）..."
     sysctl -w net.core.rmem_max=67108864  # 64MB接收缓冲
     sysctl -w net.core.wmem_max=67108864  # 64MB发送缓冲
@@ -90,6 +94,10 @@ system_tune() {
 
 # ---------- 尝试开防火墙端口 ----------
 open_firewall() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "⚠️ 非Root权限，跳过防火墙设置。请手动开启UDP端口 ${SERVER_PORT}。"
+        return
+    fi
     echo "🔥 尝试开启UDP端口 ${SERVER_PORT}..."
     if command -v ufw >/dev/null; then
         ufw allow ${SERVER_PORT}/udp && ufw reload
