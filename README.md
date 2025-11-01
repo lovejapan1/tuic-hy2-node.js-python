@@ -8,9 +8,9 @@
 
 - 兼容 Node.js 与 Python 环境
 - 支持命令行自定义端口号
-
+```
 curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/main/hy2.sh | sed 's/\r$//' | bash -s -- [端口号]
-
+```
 > ✨ **请将 `[端口号]` 替换为你需要的端口（如 443、22222 等）**
 
 ---
@@ -18,9 +18,9 @@ curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/ma
 ## 2️⃣ TUIC 部署
 
 - Node.js/Python 环境一键部署
-
+```
 curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/main/tuic.sh | sed 's/\r$//' | bash
-
+```
 ---
 
 ## 🌟 推荐云服务器平台
