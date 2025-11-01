@@ -15,7 +15,7 @@ CERT_PEM="tuic-cert.pem"
 KEY_PEM="tuic-key.pem"
 LINK_TXT="tuic_link.txt"
 TUIC_BIN="./tuic-server"
-FALLBACK_VERSION="v1.4.5"
+FALLBACK_VERSION="v1.6.1"
 GITHUB_REPO="Itsusinn/tuic"
 
 # ========== 获取最新版本号 ==========
@@ -172,7 +172,7 @@ check_tuic_server() {
       echo "❌ 2. Try using a VPN or proxy"
       echo "❌ 3. Check if GitHub is accessible in your region"
       echo "❌ 4. Or download manually from:"
-      echo "❌    https://github.com/${GITHUB_REPO}/releases"
+      echo "❌    https://github.com/Itsusinn/tuic/releases"
       echo "❌    Then place the binary as: ./tuic-server"
       echo "❌ ==============================================="
       echo ""
@@ -227,7 +227,7 @@ EOF
 get_server_ip() {
   local ip
   
-  # 尝试多个 IP 检测服务
+  # 尝试多个 IP 检测服务 - 所有 URL 已修复
   ip=$(curl -s --connect-timeout 3 --max-time 5 https://api64.ipify.org 2>/dev/null) && [[ -n "$ip" ]] && echo "$ip" && return
   ip=$(curl -s --connect-timeout 3 --max-time 5 https://ipinfo.io/ip 2>/dev/null) && [[ -n "$ip" ]] && echo "$ip" && return
   ip=$(curl -s --connect-timeout 3 --max-time 5 https://icanhazip.com 2>/dev/null) && [[ -n "$ip" ]] && echo "$ip" && return
