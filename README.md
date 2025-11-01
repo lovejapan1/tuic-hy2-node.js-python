@@ -15,7 +15,7 @@ curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/ma
 
 ---
 
-## 2️⃣ TUIC 部署
+## 2️⃣ TUIC 部署自动获取容器端口
 
 - Node.js/Python 环境一键部署
 ```
