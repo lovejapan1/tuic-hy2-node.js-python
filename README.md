@@ -19,9 +19,9 @@ curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/ma
 curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/main/tuic.sh | sed 's/\r$//' | bash
 
 
-## 适用
+# 推荐的托管服务
 
-- [Lunes](https://lunes.host/) - 游戏和机器人托管
-- [Orihost](https://orihost.com/) - 可靠的主机服务
-- [Wispbyte](https://wispbyte.com/) - 免费24小时托管
----
+- [Lunes](https://lunes.host/)
+- [Orihost](https://orihost.com/)
+- [Wispbyte](https://wispbyte.com/)
+
