@@ -1,12 +1,11 @@
 #!/bin/bash
 
 # =========================================
-# TUIC over QUIC
+# TUIC over QUIC 
 # 固定 SNI：www.bing.com
 # =========================================
 
 set -euo pipefail
-
 export LC_ALL=C
 IFS=$'\n\t'
 
@@ -16,52 +15,29 @@ CERT_PEM="tuic-cert.pem"
 KEY_PEM="tuic-key.pem"
 LINK_TXT="tuic_link.txt"
 TUIC_BIN="./tuic-server"
-VERSION_FILE="tuic-version.txt"
+FALLBACK_VERSION="v1.4.5"
+GITHUB_REPO="Itsusinn/tuic"
 
-# ========== 获取最新版本 ==========
+# ========== 获取最新版本号 ==========
 get_latest_version() {
-  echo "🔍 Fetching latest TUIC version..."
+  echo "🔍 Fetching latest release from GitHub..."
   local latest_version
-  latest_version=$(curl -s --connect-timeout 10 "https://api.github.com/repos/Itsusinn/tuic/releases/latest" | grep '"tag_name"' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/' || echo "")
   
-  if [[ -z "$latest_version" ]]; then
-    echo "⚠️ Failed to fetch latest version, falling back to v1.4.5"
-    echo "v1.4.5"
-  else
-    echo "✅ Latest version: $latest_version"
+  # 尝试从 GitHub API 获取最新版本
+  latest_version=$(curl -s --connect-timeout 5 --max-time 10 \
+    "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" \
+    | grep '"tag_name":' \
+    | sed -E 's/.*"tag_name": "([^"]+)".*/\1/' \
+    | head -n1)
+  
+  # 验证版本号格式 (应该是 vX.X.X 格式)
+  if [[ -n "$latest_version" && "$latest_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "✅ Latest version found: $latest_version"
     echo "$latest_version"
-  fi
-}
-
-# ========== 获取当前版本 ==========
-get_current_version() {
-  if [[ -f "$VERSION_FILE" ]]; then
-    cat "$VERSION_FILE"
   else
-    echo ""
+    echo "⚠️ Failed to fetch latest version, using fallback: $FALLBACK_VERSION"
+    echo "$FALLBACK_VERSION"
   fi
-}
-
-# ========== 保存版本信息 ==========
-save_version() {
-  echo "$1" > "$VERSION_FILE"
-}
-
-# ========== 检查是否需要更新 ==========
-needs_update() {
-  local current_version="$1"
-  local latest_version="$2"
-  
-  if [[ -z "$current_version" ]] || [[ ! -x "$TUIC_BIN" ]]; then
-    return 0  # 需要下载/更新
-  fi
-  
-  if [[ "$current_version" != "$latest_version" ]]; then
-    echo "🔄 Update available: $current_version → $latest_version"
-    return 0  # 需要更新
-  fi
-  
-  return 1  # 不需要更新
 }
 
 # ========== 随机端口 ==========
@@ -96,7 +72,6 @@ load_existing_config() {
     echo "📂 Existing config detected. Loading..."
     return 0
   fi
-
   return 1
 }
 
@@ -110,47 +85,55 @@ generate_cert() {
   echo "🔐 Generating self-signed certificate for ${MASQ_DOMAIN}..."
   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
     -keyout "$KEY_PEM" -out "$CERT_PEM" -subj "/CN=${MASQ_DOMAIN}" -days 365 -nodes >/dev/null 2>&1
-
   chmod 600 "$KEY_PEM"
   chmod 644 "$CERT_PEM"
 }
 
-# ========== 下载/更新 tuic-server ==========
+# ========== 下载 tuic-server (自动最新版) ==========
 check_tuic_server() {
-  local latest_version current_version
-  
-  latest_version=$(get_latest_version)
-  current_version=$(get_current_version)
-  
-  if needs_update "$current_version" "$latest_version"; then
-    echo "📥 Downloading tuic-server $latest_version..."
+  if [[ -x "$TUIC_BIN" ]]; then
+    echo "✅ tuic-server already exists."
     
-    # 创建备份（如果存在旧版本）
-    if [[ -f "$TUIC_BIN" ]]; then
-      mv "$TUIC_BIN" "${TUIC_BIN}.backup"
-      echo "💾 Backup created: ${TUIC_BIN}.backup"
+    # 检查是否需要更新
+    local current_version=""
+    if [[ -f "${TUIC_BIN}.version" ]]; then
+      current_version=$(cat "${TUIC_BIN}.version")
     fi
     
-    # 下载新版本
-    local download_url="https://github.com/Itsusinn/tuic/releases/download/${latest_version}/tuic-server-x86_64-linux"
-    if curl -L -o "$TUIC_BIN" "$download_url"; then
-      chmod +x "$TUIC_BIN"
-      save_version "$latest_version"
-      echo "✅ Successfully updated to $latest_version"
-      
-      # 删除备份（如果下载成功）
-      [[ -f "${TUIC_BIN}.backup" ]] && rm -f "${TUIC_BIN}.backup"
+    local latest_version=$(get_latest_version)
+    
+    if [[ -n "$current_version" && "$current_version" == "$latest_version" ]]; then
+      echo "✅ Already running latest version: $latest_version"
+      return
     else
-      echo "❌ Failed to download $latest_version"
-      # 恢复备份
-      if [[ -f "${TUIC_BIN}.backup" ]]; then
-        mv "${TUIC_BIN}.backup" "$TUIC_BIN"
-        echo "🔄 Restored from backup"
-      fi
+      echo "🔄 New version available: $latest_version (current: ${current_version:-unknown})"
+      echo "   To update, delete $TUIC_BIN and re-run the script."
+    fi
+    return
+  fi
+
+  local version=$(get_latest_version)
+  local download_url="https://github.com/${GITHUB_REPO}/releases/download/${version}/tuic-server-x86_64-linux"
+  
+  echo "📥 Downloading tuic-server ${version}..."
+  echo "   URL: $download_url"
+  
+  if curl -L -o "$TUIC_BIN" "$download_url" --connect-timeout 10 --max-time 60; then
+    chmod +x "$TUIC_BIN"
+    echo "$version" > "${TUIC_BIN}.version"
+    echo "✅ Successfully downloaded tuic-server ${version}"
+  else
+    echo "❌ Download failed!"
+    if [[ "$version" != "$FALLBACK_VERSION" ]]; then
+      echo "🔄 Retrying with fallback version: $FALLBACK_VERSION"
+      download_url="https://github.com/${GITHUB_REPO}/releases/download/${FALLBACK_VERSION}/tuic-server-x86_64-linux"
+      curl -L -o "$TUIC_BIN" "$download_url"
+      chmod +x "$TUIC_BIN"
+      echo "$FALLBACK_VERSION" > "${TUIC_BIN}.version"
+      echo "✅ Successfully downloaded tuic-server ${FALLBACK_VERSION}"
+    else
       exit 1
     fi
-  else
-    echo "✅ tuic-server is up to date ($current_version)"
   fi
 }
 
@@ -193,7 +176,6 @@ max_idle_time = "25s"
 [quic.congestion_control]
 controller = "bbr"
 initial_window = 6291456
-
 EOF
 }
 
@@ -205,12 +187,9 @@ get_server_ip() {
 # ========== 生成TUIC链接 ==========
 generate_link() {
   local ip="$1"
-  local current_version
-  current_version=$(get_current_version)
-  
   # 节点输出链接
   cat > "$LINK_TXT" <<EOF
-tuic://${TUIC_UUID}:${TUIC_PASSWORD}@${ip}:${TUIC_PORT}?congestion_control=bbr&alpn=h3&allowInsecure=1&sni=${MASQ_DOMAIN}&udp_relay_mode=native&disable_sni=0&reduce_rtt=1&max_udp_relay_packet_size=8192#TUIC-${ip}-${current_version}
+tuic://${TUIC_UUID}:${TUIC_PASSWORD}@${ip}:${TUIC_PORT}?congestion_control=bbr&alpn=h3&allowInsecure=1&sni=${MASQ_DOMAIN}&udp_relay_mode=native&disable_sni=0&reduce_rtt=1&max_udp_relay_packet_size=8192#TUIC-${ip}
 EOF
 
   echo "🔗 TUIC link generated successfully:"
@@ -220,10 +199,6 @@ EOF
 # ========== 守护进程 ==========
 run_background_loop() {
   echo "🚀 Starting TUIC server..."
-  local current_version
-  current_version=$(get_current_version)
-  echo "📊 Running TUIC version: $current_version"
-  
   while true; do
     "$TUIC_BIN" -c "$SERVER_TOML" >/dev/null 2>&1 || true
     echo "⚠️ TUIC crashed. Restarting in 5s..."
@@ -231,79 +206,8 @@ run_background_loop() {
   done
 }
 
-# ========== 手动更新命令 ==========
-manual_update() {
-  echo "🔄 Manual update requested..."
-  # 强制重新检查和下载
-  rm -f "$VERSION_FILE"
-  check_tuic_server
-  echo "✅ Manual update completed"
-}
-
-# ========== 显示版本信息 ==========
-show_version() {
-  local current_version latest_version
-  current_version=$(get_current_version)
-  latest_version=$(get_latest_version)
-  
-  echo "📊 Version Information:"
-  echo "   Current: ${current_version:-"Not installed"}"
-  echo "   Latest:  $latest_version"
-  
-  if [[ -n "$current_version" ]] && [[ "$current_version" != "$latest_version" ]]; then
-    echo "   Status:  🔄 Update available"
-  elif [[ -n "$current_version" ]]; then
-    echo "   Status:  ✅ Up to date"
-  else
-    echo "   Status:  ❌ Not installed"
-  fi
-}
-
-# ========== 显示帮助信息 ==========
-show_help() {
-  echo "TUIC Auto-Deploy Script with Auto-Update"
-  echo ""
-  echo "Usage: $0 [COMMAND] [PORT]"
-  echo ""
-  echo "Commands:"
-  echo "  start [PORT]    Start TUIC server (default)"
-  echo "  update          Force update to latest version"
-  echo "  version         Show version information"
-  echo "  help            Show this help message"
-  echo ""
-  echo "Examples:"
-  echo "  $0              # Start with random port"
-  echo "  $0 8443         # Start with port 8443"
-  echo "  $0 update       # Force update to latest"
-  echo "  $0 version      # Show version info"
-}
-
 # ========== 主流程 ==========
 main() {
-  # 处理命令行参数
-  case "${1:-start}" in
-    "update")
-      manual_update
-      exit 0
-      ;;
-    "version")
-      show_version
-      exit 0
-      ;;
-    "help"|"-h"|"--help")
-      show_help
-      exit 0
-      ;;
-    "start"|[0-9]*)
-      # 继续正常流程
-      ;;
-    *)
-      echo "❌ Unknown command: $1"
-      show_help
-      exit 1
-      ;;
-  esac
-
   if ! load_existing_config; then
     read_port "$@"
     TUIC_UUID="$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen)"
