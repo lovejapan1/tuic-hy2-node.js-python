@@ -15,13 +15,10 @@ curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/ma
 
 * Node.js/Python运行环境一键极简部署TUIC节点
 
-* 必须在一键脚本末尾添加自定义端口
-
 ```
-curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/main/tuic.sh | sed 's/\r$//' | bash -s -- 
-```
+curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/main/tuic.sh | sed 's/\r$//' | bash
 
 
 ## 适用
-- [lunes](https://lunes.host/) 和 [orihost](https://orihost.com/)
+- [lunes](https://lunes.host/) - [orihost](https://orihost.com/) - [wispbyte](https://wispbyte.com/)
 ---
