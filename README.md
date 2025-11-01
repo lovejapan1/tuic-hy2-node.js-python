@@ -20,5 +20,9 @@ curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/ma
 
 
 ## 适用
-- [lunes](https://lunes.host/) - [orihost](https://orihost.com/) - [wispbyte](https://wispbyte.com/)
----
+
+[Lunes](https://lunes.host/)
+
+[Orihost](https://orihost.com/)
+
+[Wispbyte](https://wispbyte.com/)
