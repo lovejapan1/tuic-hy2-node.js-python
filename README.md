@@ -23,7 +23,7 @@ curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/ma
 ---------------------------------------
 
 
-# 推荐的托管服务
+# 适用
 
 - [Lunes](https://lunes.host/)
 - [Orihost](https://orihost.com/)
