@@ -89,7 +89,7 @@ generate_cert() {
   chmod 644 "$CERT_PEM"
 }
 
-# ========== 下载 tuic-server (自动最新版) ==========
+# ========== 下载 tuic-server (多源备选) ==========
 check_tuic_server() {
   if [[ -x "$TUIC_BIN" ]]; then
     echo "✅ tuic-server already exists."
@@ -113,30 +113,69 @@ check_tuic_server() {
   fi
 
   local version=$(get_latest_version)
-  local download_url="https://github.com/${GITHUB_REPO}/releases/download/${version}/tuic-server-x86_64-linux"
+  
+  # 定义多个下载源
+  declare -a download_urls=(
+    "https://github.com/${GITHUB_REPO}/releases/download/${version}/tuic-server-x86_64-linux"
+    "https://ghproxy.com/https://github.com/${GITHUB_REPO}/releases/download/${version}/tuic-server-x86_64-linux"
+    "https://mirror.ghproxy.com/https://github.com/${GITHUB_REPO}/releases/download/${version}/tuic-server-x86_64-linux"
+  )
   
   echo "📥 Downloading tuic-server ${version}..."
-  echo "   URL: $download_url"
   
-  if curl -L -o "$TUIC_BIN" "$download_url" --connect-timeout 10 --max-time 60 2>/dev/null; then
-    chmod +x "$TUIC_BIN"
-    echo "$version" > "${TUIC_BIN}.version"
-    echo "✅ Successfully downloaded tuic-server ${version}"
-  else
-    echo "❌ Download failed!"
+  local downloaded=0
+  for url in "${download_urls[@]}"; do
+    echo "   Trying: $url"
+    if curl -L -o "$TUIC_BIN" "$url" --connect-timeout 10 --max-time 120 --retry 2 2>/dev/null; then
+      if [[ -s "$TUIC_BIN" ]]; then
+        chmod +x "$TUIC_BIN"
+        echo "$version" > "${TUIC_BIN}.version"
+        echo "✅ Successfully downloaded tuic-server ${version}"
+        downloaded=1
+        break
+      fi
+    fi
+  done
+  
+  if [[ $downloaded -eq 0 ]]; then
+    echo "❌ Failed to download version $version from all sources"
+    
     if [[ "$version" != "$FALLBACK_VERSION" ]]; then
       echo "🔄 Retrying with fallback version: $FALLBACK_VERSION"
-      download_url="https://github.com/${GITHUB_REPO}/releases/download/${FALLBACK_VERSION}/tuic-server-x86_64-linux"
-      if curl -L -o "$TUIC_BIN" "$download_url" --connect-timeout 10 --max-time 60 2>/dev/null; then
-        chmod +x "$TUIC_BIN"
-        echo "$FALLBACK_VERSION" > "${TUIC_BIN}.version"
-        echo "✅ Successfully downloaded tuic-server ${FALLBACK_VERSION}"
-      else
-        echo "❌ All download attempts failed. Please check your network connection."
-        exit 1
-      fi
-    else
-      echo "❌ All download attempts failed. Please check your network connection."
+      
+      local fallback_urls=(
+        "https://github.com/${GITHUB_REPO}/releases/download/${FALLBACK_VERSION}/tuic-server-x86_64-linux"
+        "https://ghproxy.com/https://github.com/${GITHUB_REPO}/releases/download/${FALLBACK_VERSION}/tuic-server-x86_64-linux"
+        "https://mirror.ghproxy.com/https://github.com/${GITHUB_REPO}/releases/download/${FALLBACK_VERSION}/tuic-server-x86_64-linux"
+      )
+      
+      for url in "${fallback_urls[@]}"; do
+        echo "   Trying: $url"
+        if curl -L -o "$TUIC_BIN" "$url" --connect-timeout 10 --max-time 120 --retry 2 2>/dev/null; then
+          if [[ -s "$TUIC_BIN" ]]; then
+            chmod +x "$TUIC_BIN"
+            echo "$FALLBACK_VERSION" > "${TUIC_BIN}.version"
+            echo "✅ Successfully downloaded tuic-server ${FALLBACK_VERSION}"
+            downloaded=1
+            break
+          fi
+        fi
+      done
+    fi
+    
+    if [[ $downloaded -eq 0 ]]; then
+      echo ""
+      echo "❌ ==============================================="
+      echo "❌ All download attempts failed!"
+      echo "❌ Solutions:"
+      echo "❌ 1. Check your network connection"
+      echo "❌ 2. Try using a VPN or proxy"
+      echo "❌ 3. Check if GitHub is accessible in your region"
+      echo "❌ 4. Or download manually from:"
+      echo "❌    https://github.com/${GITHUB_REPO}/releases"
+      echo "❌    Then place the binary as: ./tuic-server"
+      echo "❌ ==============================================="
+      echo ""
       exit 1
     fi
   fi
@@ -187,13 +226,15 @@ EOF
 # ========== 获取公网IP ==========
 get_server_ip() {
   local ip
-  # 尝试多个 IP 检测服务
-  ip=$(curl -s --connect-timeout 3 --max-time 5 https://api64.ipify.org 2>/dev/null) || \
-  ip=$(curl -s --connect-timeout 3 --max-time 5 https://ipinfo.io/ip 2>/dev/null) || \
-  ip=$(curl -s --connect-timeout 3 --max-time 5 https://icanhazip.com 2>/dev/null) || \
-  ip="127.0.0.1"
   
-  echo "$ip"
+  # 尝试多个 IP 检测服务
+  ip=$(curl -s --connect-timeout 3 --max-time 5 https://api64.ipify.org 2>/dev/null) && [[ -n "$ip" ]] && echo "$ip" && return
+  ip=$(curl -s --connect-timeout 3 --max-time 5 https://ipinfo.io/ip 2>/dev/null) && [[ -n "$ip" ]] && echo "$ip" && return
+  ip=$(curl -s --connect-timeout 3 --max-time 5 https://icanhazip.com 2>/dev/null) && [[ -n "$ip" ]] && echo "$ip" && return
+  ip=$(curl -s --connect-timeout 3 --max-time 5 https://myip.ipip.net 2>/dev/null) && [[ -n "$ip" ]] && echo "$ip" && return
+  
+  # 所有尝试都失败，使用默认值
+  echo "127.0.0.1"
 }
 
 # ========== 生成TUIC链接 ==========
@@ -204,13 +245,23 @@ generate_link() {
 tuic://${TUIC_UUID}:${TUIC_PASSWORD}@${ip}:${TUIC_PORT}?congestion_control=bbr&alpn=h3&allowInsecure=1&sni=${MASQ_DOMAIN}&udp_relay_mode=native&disable_sni=0&reduce_rtt=1&max_udp_relay_packet_size=8192#TUIC-${ip}
 EOF
 
+  echo ""
   echo "🔗 TUIC link generated successfully:"
+  echo "=============================================="
   cat "$LINK_TXT"
+  echo "=============================================="
+  echo ""
 }
 
 # ========== 守护进程 ==========
 run_background_loop() {
   echo "🚀 Starting TUIC server..."
+  echo "📊 Server info:"
+  echo "   Port: $TUIC_PORT"
+  echo "   UUID: $TUIC_UUID"
+  echo "   Password: $TUIC_PASSWORD"
+  echo ""
+  
   while true; do
     "$TUIC_BIN" -c "$SERVER_TOML" >/dev/null 2>&1 || true
     echo "⚠️ TUIC crashed. Restarting in 5s..."
@@ -220,6 +271,11 @@ run_background_loop() {
 
 # ========== 主流程 ==========
 main() {
+  echo "========================================="
+  echo "TUIC Server Setup (QUIC Tunnel)"
+  echo "========================================="
+  echo ""
+  
   if ! load_existing_config; then
     read_port "$@"
     TUIC_UUID="$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen)"
