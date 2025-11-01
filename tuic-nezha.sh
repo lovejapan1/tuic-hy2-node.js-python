@@ -273,14 +273,14 @@ setup_nezha() {
   if [[ "$enable_nezha" == "y" || "$enable_nezha" == "Y" ]]; then
     NEZHA_ENABLED=true
     
-    read -p "📍 请输入哪吒面板地址 (例如: nezha.example.com:5555): " -r NEZHA_SERVER
+    read -p "agent.keki.dpdns.org:80" -r NEZHA_SERVER
     if [[ -z "$NEZHA_SERVER" ]]; then
       echo "❌ 哪吒面板地址不能为空"
       NEZHA_ENABLED=false
       return
     fi
     
-    read -p "🔑 请输入Agent Key (从哪吒面板获取): " -r NEZHA_KEY
+    read -p "0HcsGzDkPkRZq0RQcF46yzko3PyzOU2O" -r NEZHA_KEY
     if [[ -z "$NEZHA_KEY" ]]; then
       echo "❌ Agent Key 不能为空"
       NEZHA_ENABLED=false
