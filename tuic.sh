@@ -118,7 +118,7 @@ check_tuic_server() {
   echo "📥 Downloading tuic-server ${version}..."
   echo "   URL: $download_url"
   
-  if curl -L -o "$TUIC_BIN" "$download_url" --connect-timeout 10 --max-time 60; then
+  if curl -L -o "$TUIC_BIN" "$download_url" --connect-timeout 10 --max-time 60 2>/dev/null; then
     chmod +x "$TUIC_BIN"
     echo "$version" > "${TUIC_BIN}.version"
     echo "✅ Successfully downloaded tuic-server ${version}"
@@ -127,11 +127,16 @@ check_tuic_server() {
     if [[ "$version" != "$FALLBACK_VERSION" ]]; then
       echo "🔄 Retrying with fallback version: $FALLBACK_VERSION"
       download_url="https://github.com/${GITHUB_REPO}/releases/download/${FALLBACK_VERSION}/tuic-server-x86_64-linux"
-      curl -L -o "$TUIC_BIN" "$download_url"
-      chmod +x "$TUIC_BIN"
-      echo "$FALLBACK_VERSION" > "${TUIC_BIN}.version"
-      echo "✅ Successfully downloaded tuic-server ${FALLBACK_VERSION}"
+      if curl -L -o "$TUIC_BIN" "$download_url" --connect-timeout 10 --max-time 60 2>/dev/null; then
+        chmod +x "$TUIC_BIN"
+        echo "$FALLBACK_VERSION" > "${TUIC_BIN}.version"
+        echo "✅ Successfully downloaded tuic-server ${FALLBACK_VERSION}"
+      else
+        echo "❌ All download attempts failed. Please check your network connection."
+        exit 1
+      fi
     else
+      echo "❌ All download attempts failed. Please check your network connection."
       exit 1
     fi
   fi
@@ -181,7 +186,14 @@ EOF
 
 # ========== 获取公网IP ==========
 get_server_ip() {
-  curl -s --connect-timeout 3 https://api64.ipify.org || echo "127.0.0.1"
+  local ip
+  # 尝试多个 IP 检测服务
+  ip=$(curl -s --connect-timeout 3 --max-time 5 https://api64.ipify.org 2>/dev/null) || \
+  ip=$(curl -s --connect-timeout 3 --max-time 5 https://ipinfo.io/ip 2>/dev/null) || \
+  ip=$(curl -s --connect-timeout 3 --max-time 5 https://icanhazip.com 2>/dev/null) || \
+  ip="127.0.0.1"
+  
+  echo "$ip"
 }
 
 # ========== 生成TUIC链接 ==========
