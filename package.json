@@ -15,7 +15,7 @@
     "nodejs",
     "no-root"
   ],
-  "author": "eishare",
+  "author": "MIT",
   "license": "MIT",
   "engines": {
     "node": ">=18"
