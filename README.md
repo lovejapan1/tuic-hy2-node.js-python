@@ -30,6 +30,7 @@ curl -Ls https://raw.githubusercontent.com/lovejapan1/tuic-hy2-node.js-python/ma
 | **Lunes**      | [https://lunes.host/](https://lunes.host/)         |
 | **Orihost**    | [https://orihost.com/](https://orihost.com/)       |
 | **Wispbyte**   | [https://wispbyte.com/](https://wispbyte.com/)     |
+| **Katabump**   | [https://katabump.com/](https://katabump.com/)     |
 
 ---
 
